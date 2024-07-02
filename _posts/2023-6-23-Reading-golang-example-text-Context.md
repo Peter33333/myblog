@@ -230,5 +230,3 @@ fmt.Println(n)， 打印循环体n，
 
 
 而这个example很好的展示了WithCancel的用法和cancel方法behavior, 怎么利用一个ctx来保护goroutine, 使他不要leak，而且可以看到，example_test.go的一个简单example, 其实包含了非常多前提知识，这对初学者来说并不容易。
-
-![image-20240623123510962](./assets/img/cuba-2.jpg)
