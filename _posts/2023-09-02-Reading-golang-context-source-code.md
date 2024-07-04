@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "Golang example_text(3) : sync/context"
+title: "Golang example_text(3) : sync waitgroup"
 author: "Peter"
 categories: documentation
 tags: [documentation,sample]
@@ -291,19 +291,27 @@ if w != 0 && delta > 0 && v == int32(delta) 则panic, 也就是说waiter count�
 
 
 
-if v > 0 || w == 0 正常情况，加完delta后 counter 大于0，或者waiter等于0的情况，直接返回
+if v > 0 \|\| w == 0 正常情况，加完delta后 counter 大于0，或者waiter等于0的情况，直接返回
 
 
+
+
+
+最后, 剩下的case就是，v 在加上delta之后，刚好的等于0的情况，
+
+
+
+先做一次 sanity check， wg.state.Load() != state 
 
 这一步是又在做了一次低成本的检查，wg.state.Load()是原子操作，我们在Add方法内部再做一次check，
-
-wg.state.Load() != state 说明 w 也就是waiter count 不等于0，则panic，
 
 注意这里的check只是一次额外的查询，以上的所有机制，都并没有办法完全防止机制2的发生（原因很简单，Add和Wait都不是原子操作，他们中间的任何一步中间，都有可能发生state状态的改变），机制2需要由调用者来确保。
 
 
 
-最后
+然后，直接吧wg.state 设为0， 然后释放所有的wait goroutine
+
+
 
 
 
@@ -350,3 +358,19 @@ func (wg *WaitGroup) Wait() {
 }
 ```
 
+接下来我们看Wait方法， 同样，让我们ignore race.Enabled相关的snippet
+
+然后我们看到一个大的for loop
+
+判断如果counter == 0 ，则return
+
+我们compareAndSwap state+1, 如果返回ture说明修改成功（CAS会先检查state当前值是否等于传入的state， 是 则更新值并返回true, 否则直接返回false并不做更新）
+
+runtime_Semacquire(&wg.sema), 我们可以直接理解为，当前goroutine等待一次 runtime_Semrelease（也就是Add function里最后的操作）
+
+```
+// Semacquire waits until *s > 0 and then atomically decrements it.
+// It is intended as a simple sleep primitive for use by the synchronization
+// library and should not be used directly.
+func runtime_Semacquire(s *uint32)
+```
